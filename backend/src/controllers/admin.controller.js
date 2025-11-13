@@ -35,8 +35,16 @@ export async function listUsers(req, res, next) {
   try {
     let users = await getAllUsers();
 
-    const { name, email, address, role, sortBy = 'name', order = 'asc' } =
-      req.query;
+    const {
+      name,
+      email,
+      address,
+      role,
+      sortBy = 'name',
+      order = 'asc',
+      page = '1',
+      pageSize = '10',
+    } = req.query;
 
     if (name) {
       users = users.filter((u) => includesInsensitive(u.name, name));
@@ -67,7 +75,21 @@ export async function listUsers(req, res, next) {
       return 0;
     });
 
-    return res.json({ users });
+    const pageNum = parseInt(page, 10) || 1;
+    const sizeNum = parseInt(pageSize, 10) || 10;
+    const total = users.length;
+    const totalPages = Math.max(1, Math.ceil(total / sizeNum));
+    const safePage = Math.min(Math.max(pageNum, 1), totalPages);
+    const start = (safePage - 1) * sizeNum;
+    const paged = users.slice(start, start + sizeNum);
+
+    return res.json({
+      users: paged,
+      page: safePage,
+      pageSize: sizeNum,
+      total,
+      totalPages,
+    });
   } catch (err) {
     next(err);
   }
@@ -78,7 +100,15 @@ export async function listStores(req, res, next) {
   try {
     let stores = await getAllStores();
 
-    const { name, email, address, sortBy = 'name', order = 'asc' } = req.query;
+    const {
+      name,
+      email,
+      address,
+      sortBy = 'name',
+      order = 'asc',
+      page = '1',
+      pageSize = '10',
+    } = req.query;
 
     if (name) {
       stores = stores.filter((s) => includesInsensitive(s.name, name));
@@ -122,7 +152,21 @@ export async function listStores(req, res, next) {
       return 0;
     });
 
-    return res.json({ stores: storesWithRating });
+    const pageNum = parseInt(page, 10) || 1;
+    const sizeNum = parseInt(pageSize, 10) || 10;
+    const total = storesWithRating.length;
+    const totalPages = Math.max(1, Math.ceil(total / sizeNum));
+    const safePage = Math.min(Math.max(pageNum, 1), totalPages);
+    const start = (safePage - 1) * sizeNum;
+    const paged = storesWithRating.slice(start, start + sizeNum);
+
+    return res.json({
+      stores: paged,
+      page: safePage,
+      pageSize: sizeNum,
+      total,
+      totalPages,
+    });
   } catch (err) {
     next(err);
   }

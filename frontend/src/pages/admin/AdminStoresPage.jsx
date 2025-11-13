@@ -20,6 +20,11 @@ export default function AdminStoresPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
   // create / edit form state
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -40,7 +45,7 @@ export default function AdminStoresPage() {
     setFormValues((prev) => ({ ...prev, [field]: value }));
   }
 
-  async function fetchStores() {
+  async function fetchStores(nextPage = page) {
     if (!token) return;
     setLoading(true);
     setError('');
@@ -52,9 +57,14 @@ export default function AdminStoresPage() {
           name: filters.name || undefined,
           email: filters.email || undefined,
           address: filters.address || undefined,
+          page: nextPage,
+          pageSize,
         },
       });
       setStores(res.data.stores || []);
+      setPage(res.data.page);
+      setTotalPages(res.data.totalPages);
+      setTotal(res.data.total);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load stores');
     } finally {
@@ -63,7 +73,7 @@ export default function AdminStoresPage() {
   }
 
   useEffect(() => {
-    fetchStores();
+    fetchStores(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -124,6 +134,14 @@ export default function AdminStoresPage() {
     fontSize: 12,
     color: '#6B7280',
     marginBottom: 4,
+  };
+
+  const paginationRow = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    fontSize: 13,
   };
 
   const columns = [
@@ -200,7 +218,7 @@ export default function AdminStoresPage() {
       });
       setShowCreateForm(false);
       setShowEditForm(false);
-      await fetchStores();
+      await fetchStores(1);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save store');
     } finally {
@@ -377,7 +395,7 @@ export default function AdminStoresPage() {
               <option value="desc">Desc</option>
             </select>
             <Button
-              onClick={fetchStores}
+              onClick={() => fetchStores(1)}
               style={{
                 padding: '8px 14px',
                 background: '#2563EB',
@@ -397,6 +415,44 @@ export default function AdminStoresPage() {
         {error && <p style={errorText}>{error}</p>}
 
         <Table columns={columns} data={data} />
+
+        <div style={paginationRow}>
+          <span>
+            Showing page {page} of {totalPages} · Total {total} stores
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => fetchStores(page - 1)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 999,
+                background: page <= 1 ? '#E5E7EB' : '#F3F4F6',
+                color: '#111827',
+                border: '1px solid #D1D5DB',
+                fontSize: 13,
+              }}
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              disabled={page >= totalPages}
+              onClick={() => fetchStores(page + 1)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 999,
+                background: page >= totalPages ? '#E5E7EB' : '#F3F4F6',
+                color: '#111827',
+                border: '1px solid #D1D5DB',
+                fontSize: 13,
+              }}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </div>
     </AdminLayout>
   );

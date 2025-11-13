@@ -16,6 +16,8 @@ export async function getStoresForUser(req, res, next) {
 
     const searchName = (req.query.searchName || '').toLowerCase();
     const searchAddress = (req.query.searchAddress || '').toLowerCase();
+    const page = parseInt(req.query.page || '1', 10);
+    const pageSize = parseInt(req.query.pageSize || '10', 10);
 
     let stores = await getAllStores();
 
@@ -32,7 +34,7 @@ export async function getStoresForUser(req, res, next) {
     }
 
     // Attach rating info
-    const mapped = await Promise.all(
+    const withRatings = await Promise.all(
       stores.map(async (s) => {
         const avgRating = await getAverageRatingForStore(s.id);
         const userRatingObj = await getUserRatingForStore(userId, s.id);
@@ -48,7 +50,19 @@ export async function getStoresForUser(req, res, next) {
       })
     );
 
-    return res.json({ stores: mapped });
+    const total = withRatings.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(Math.max(page, 1), totalPages);
+    const start = (safePage - 1) * pageSize;
+    const paged = withRatings.slice(start, start + pageSize);
+
+    return res.json({
+      stores: paged,
+      page: safePage,
+      pageSize,
+      total,
+      totalPages,
+    });
   } catch (err) {
     next(err);
   }

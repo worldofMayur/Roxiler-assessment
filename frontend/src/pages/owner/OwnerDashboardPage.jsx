@@ -23,6 +23,12 @@ export default function OwnerDashboardPage() {
   const [loadingRaters, setLoadingRaters] = useState(false);
   const [error, setError] = useState('');
 
+  // pagination for owner stores
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(8);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
   // create / edit form state
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
@@ -54,15 +60,22 @@ export default function OwnerDashboardPage() {
     }
   }
 
-  async function fetchStores() {
+  async function fetchStores(nextPage = page) {
     if (!token) return;
     setLoadingStores(true);
     setError('');
     try {
       const res = await api.get('/owner/stores', {
         headers: { Authorization: `Bearer ${token}` },
+        params: {
+          page: nextPage,
+          pageSize,
+        },
       });
       setStores(res.data.stores || []);
+      setPage(res.data.page);
+      setTotalPages(res.data.totalPages);
+      setTotal(res.data.total);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load stores');
     } finally {
@@ -89,7 +102,7 @@ export default function OwnerDashboardPage() {
 
   useEffect(() => {
     fetchStats();
-    fetchStores();
+    fetchStores(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -129,7 +142,7 @@ export default function OwnerDashboardPage() {
       setShowEditForm(false);
 
       // refresh data
-      await Promise.all([fetchStores(), fetchStats()]);
+      await Promise.all([fetchStores(1), fetchStats()]);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save store');
     } finally {
@@ -240,6 +253,14 @@ export default function OwnerDashboardPage() {
     fontSize: 12,
     color: '#6B7280',
     marginBottom: 4,
+  };
+
+  const paginationRow = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    fontSize: 13,
   };
 
   const columns = [
@@ -437,31 +458,32 @@ export default function OwnerDashboardPage() {
                       ? 'Create'
                       : 'Save'}
                   </Button>
-                  {(showCreateForm || showEditForm) && (
-                    <Button
-                      type="button"
-                      style={{
-                        padding: '8px 14px',
-                        background: '#E5E7EB',
-                        color: '#374151',
-                        border: 'none',
-                        borderRadius: 10,
-                        fontSize: 13,
-                      }}
-                      onClick={() => {
-                        setShowCreateForm(false);
-                        setShowEditForm(false);
-                        setFormValues({
-                          id: null,
-                          name: '',
-                          email: '',
-                          address: '',
-                        });
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  )}
+                  {(showCreateForm || showEditForm) &&
+                    (
+                      <Button
+                        type="button"
+                        style={{
+                          padding: '8px 14px',
+                          background: '#E5E7EB',
+                          color: '#374151',
+                          border: 'none',
+                          borderRadius: 10,
+                          fontSize: 13,
+                        }}
+                        onClick={() => {
+                          setShowCreateForm(false);
+                          setShowEditForm(false);
+                          setFormValues({
+                            id: null,
+                            name: '',
+                            email: '',
+                            address: '',
+                          });
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    )}
                 </div>
               </div>
             </form>
@@ -477,7 +499,47 @@ export default function OwnerDashboardPage() {
               create one.
             </p>
           ) : (
-            <Table columns={columns} data={data} />
+            <>
+              <Table columns={columns} data={data} />
+
+              <div style={paginationRow}>
+                <span>
+                  Showing page {page} of {totalPages} · Total {total} stores
+                </span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Button
+                    type="button"
+                    disabled={page <= 1}
+                    onClick={() => fetchStores(page - 1)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 999,
+                      background: page <= 1 ? '#E5E7EB' : '#F3F4F6',
+                      color: '#111827',
+                      border: '1px solid #D1D5DB',
+                      fontSize: 13,
+                    }}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={page >= totalPages}
+                    onClick={() => fetchStores(page + 1)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 999,
+                      background: page >= totalPages ? '#E5E7EB' : '#F3F4F6',
+                      color: '#111827',
+                      border: '1px solid #D1D5DB',
+                      fontSize: 13,
+                    }}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
         </div>
 

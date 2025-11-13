@@ -1,23 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import UserLayout from '../../components/Layout/UserLayout.jsx';
-import Input from '../../components/UI/Input.jsx';
-import Button from '../../components/UI/Button.jsx';
 import Table from '../../components/UI/Table.jsx';
 import RatingStars from '../../components/UI/RatingStars.jsx';
+import Input from '../../components/UI/Input.jsx';
+import Button from '../../components/UI/Button.jsx';
 import api from '../../api/client.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function UserStoresPage() {
   const { token } = useAuth();
+
   const [stores, setStores] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [searchName, setSearchName] = useState('');
   const [searchAddress, setSearchAddress] = useState('');
-  const [savingStoreId, setSavingStoreId] = useState(null);
-  const [ratingDrafts, setRatingDrafts] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  async function fetchStores() {
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(6);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  const [savingStoreId, setSavingStoreId] = useState(null);
+
+  async function fetchStores(nextPage = page) {
     if (!token) return;
     setLoading(true);
     setError('');
@@ -27,9 +33,14 @@ export default function UserStoresPage() {
         params: {
           searchName: searchName || undefined,
           searchAddress: searchAddress || undefined,
+          page: nextPage,
+          pageSize,
         },
       });
       setStores(res.data.stores || []);
+      setPage(res.data.page);
+      setTotalPages(res.data.totalPages);
+      setTotal(res.data.total);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load stores');
     } finally {
@@ -38,30 +49,23 @@ export default function UserStoresPage() {
   }
 
   useEffect(() => {
-    fetchStores();
+    fetchStores(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  function handleChangeRating(storeId, value) {
-    setRatingDrafts((prev) => ({ ...prev, [storeId]: value }));
-  }
-
-  async function handleSaveRating(storeId) {
-    const value = Number(ratingDrafts[storeId]);
-    if (!value) return;
-
+  async function handleRate(storeId, value) {
+    if (!token) return;
     setSavingStoreId(storeId);
+    setError('');
     try {
       await api.post(
         `/ratings/${storeId}`,
         { rating: value },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-      await fetchStores();
+      await fetchStores(page);
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to save rating');
+      setError(err.response?.data?.message || 'Failed to save rating');
     } finally {
       setSavingStoreId(null);
     }
@@ -71,19 +75,19 @@ export default function UserStoresPage() {
     background: '#FFFFFF',
     borderRadius: 18,
     padding: '20px 20px 18px',
-    boxShadow: '0 16px 30px rgba(15,23,42,0.08)',
-    boxSizing: 'border-box',
+    boxShadow: '0 12px 24px rgba(15,23,42,0.06)',
+    border: '1px solid #E5E7EB',
   };
 
-  const titleRow = {
+  const headerRow = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   };
 
   const title = {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 600,
   };
 
@@ -92,11 +96,11 @@ export default function UserStoresPage() {
     color: '#6B7280',
   };
 
-  const searchRow = {
-    display: 'flex',
+  const filtersRow = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr)) auto',
     gap: 8,
-    alignItems: 'center',
-    margin: '14px 0 18px',
+    marginBottom: 16,
   };
 
   const errorText = {
@@ -105,52 +109,55 @@ export default function UserStoresPage() {
     marginBottom: 10,
   };
 
+  const paginationRow = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    fontSize: 13,
+  };
+
   const columns = [
-    { key: 'name', header: 'Store Name' },
+    { key: 'name', header: 'Store' },
     { key: 'address', header: 'Address' },
-    { key: 'overall', header: 'Overall Rating' },
-    { key: 'your', header: 'Your Rating' },
-    { key: 'actions', header: 'Action' },
+    { key: 'overallRating', header: 'Overall Rating' },
+    { key: 'userRating', header: 'Your Rating' },
+    { key: 'actions', header: 'Rate' },
   ];
 
   const data = stores.map((s) => ({
     name: s.name,
     address: s.address,
-    overall: <RatingStars value={Math.round(s.overallRating || 0)} />,
-    your: <RatingStars value={s.userRating || 0} />,
+    overallRating: <RatingStars value={Math.round(s.overallRating || 0)} />,
+    userRating: s.userRating ? (
+      <RatingStars value={s.userRating} />
+    ) : (
+      <span style={{ fontSize: 13, color: '#6B7280' }}>Not rated yet</span>
+    ),
     actions: (
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <select
-          value={ratingDrafts[s.id] ?? s.userRating ?? ''}
-          onChange={(e) => handleChangeRating(s.id, e.target.value)}
-          style={{
-            padding: '6px 8px',
-            borderRadius: 8,
-            border: '1px solid #D1D5DB',
-            background: '#F9FAFB',
-            fontSize: 13,
-          }}
-        >
-          <option value="">Rate…</option>
-          {[1, 2, 3, 4, 5].map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
-        </select>
-        <Button
-          disabled={!ratingDrafts[s.id] || savingStoreId === s.id}
-          onClick={() => handleSaveRating(s.id)}
-          style={{
-            padding: '6px 10px',
-            fontSize: 13,
-            borderRadius: 8,
-            background: '#2563EB',
-            border: 'none',
-          }}
-        >
-          {savingStoreId === s.id ? 'Saving…' : 'Save'}
-        </Button>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {[1, 2, 3, 4, 5].map((val) => (
+          <button
+            key={val}
+            type="button"
+            onClick={() => handleRate(s.id, val)}
+            disabled={savingStoreId === s.id}
+            style={{
+              padding: '4px 8px',
+              borderRadius: 999,
+              border:
+                s.userRating === val
+                  ? '1px solid #2563EB'
+                  : '1px solid #D1D5DB',
+              background:
+                s.userRating === val ? 'rgba(37,99,235,0.08)' : '#FFFFFF',
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            {val}
+          </button>
+        ))}
       </div>
     ),
   }));
@@ -158,16 +165,18 @@ export default function UserStoresPage() {
   return (
     <UserLayout>
       <div style={card}>
-        <div style={titleRow}>
+        <div style={headerRow}>
           <div>
             <div style={title}>Stores</div>
-            <div style={subtitle}>Browse stores and submit your ratings.</div>
+            <div style={subtitle}>
+              Browse stores and rate your experience from 1 to 5 stars.
+            </div>
           </div>
         </div>
 
-        <div style={searchRow}>
+        <div style={filtersRow}>
           <Input
-            placeholder="Search by name"
+            placeholder="Search by store name"
             value={searchName}
             onChange={(e) => setSearchName(e.target.value)}
           />
@@ -177,27 +186,63 @@ export default function UserStoresPage() {
             onChange={(e) => setSearchAddress(e.target.value)}
           />
           <Button
-            onClick={fetchStores}
+            onClick={() => fetchStores(1)}
             style={{
-              padding: '9px 14px',
+              padding: '8px 14px',
               background: '#2563EB',
               border: 'none',
               borderRadius: 10,
-              fontSize: 14,
+              fontSize: 13,
             }}
           >
-            Search
+            Apply
           </Button>
         </div>
 
-        {loading && <p style={{ fontSize: 13, color: '#6B7280' }}>Loading stores…</p>}
         {error && <p style={errorText}>{error}</p>}
-
-        {!loading && stores.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#6B7280' }}>No stores found.</p>
-        ) : (
-          <Table columns={columns} data={data} />
+        {loading && (
+          <p style={{ fontSize: 13, color: '#6B7280' }}>Loading stores…</p>
         )}
+
+        <Table columns={columns} data={data} />
+
+        <div style={paginationRow}>
+          <span>
+            Showing page {page} of {totalPages} · Total {total} stores
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => fetchStores(page - 1)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 999,
+                background: page <= 1 ? '#E5E7EB' : '#F3F4F6',
+                color: '#111827',
+                border: '1px solid #D1D5DB',
+                fontSize: 13,
+              }}
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              disabled={page >= totalPages}
+              onClick={() => fetchStores(page + 1)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 999,
+                background: page >= totalPages ? '#E5E7EB' : '#F3F4F6',
+                color: '#111827',
+                border: '1px solid #D1D5DB',
+                fontSize: 13,
+              }}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </div>
     </UserLayout>
   );

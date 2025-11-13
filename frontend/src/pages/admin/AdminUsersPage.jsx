@@ -20,11 +20,16 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
   function updateFilter(field, value) {
     setFilters((prev) => ({ ...prev, [field]: value }));
   }
 
-  async function fetchUsers() {
+  async function fetchUsers(nextPage = page) {
     if (!token) return;
     setLoading(true);
     setError('');
@@ -37,9 +42,14 @@ export default function AdminUsersPage() {
           email: filters.email || undefined,
           address: filters.address || undefined,
           role: filters.role || undefined,
+          page: nextPage,
+          pageSize,
         },
       });
       setUsers(res.data.users || []);
+      setPage(res.data.page);
+      setTotalPages(res.data.totalPages);
+      setTotal(res.data.total);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load users');
     } finally {
@@ -48,7 +58,7 @@ export default function AdminUsersPage() {
   }
 
   useEffect(() => {
-    fetchUsers();
+    fetchUsers(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -57,13 +67,10 @@ export default function AdminUsersPage() {
     borderRadius: 18,
     padding: '20px 20px 18px',
     boxShadow: '0 12px 24px rgba(15,23,42,0.06)',
-    border: '1px solid #E5E7EB',
+    border: '1px solid #E5E7EB'
   };
 
   const headerRow = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 14,
   };
 
@@ -90,6 +97,14 @@ export default function AdminUsersPage() {
     marginBottom: 10,
   };
 
+  const paginationRow = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    fontSize: 13,
+  };
+
   const columns = [
     { key: 'name', header: 'Name' },
     { key: 'email', header: 'Email' },
@@ -108,9 +123,9 @@ export default function AdminUsersPage() {
     <AdminLayout>
       <div style={card}>
         <div style={headerRow}>
-          <div>
-            <div style={title}>Users</div>
-            <div style={subtitle}>Filter and inspect all platform users.</div>
+          <div style={title}>Users</div>
+          <div style={subtitle}>
+            Filter and inspect users registered in the rating platform.
           </div>
         </div>
 
@@ -141,12 +156,11 @@ export default function AdminUsersPage() {
               fontSize: 13,
             }}
           >
-            <option value="">All roles</option>
+            <option value="">Any role</option>
             <option value="ADMIN">Admin</option>
-            <option value="USER">Normal User</option>
-            <option value="OWNER">Store Owner</option>
+            <option value="USER">User</option>
+            <option value="OWNER">Owner</option>
           </select>
-
           <div style={{ display: 'flex', gap: 8 }}>
             <select
               value={filters.sortBy}
@@ -179,7 +193,7 @@ export default function AdminUsersPage() {
               <option value="desc">Desc</option>
             </select>
             <Button
-              onClick={fetchUsers}
+              onClick={() => fetchUsers(1)}
               style={{
                 padding: '8px 14px',
                 background: '#2563EB',
@@ -193,12 +207,50 @@ export default function AdminUsersPage() {
           </div>
         </div>
 
+        {error && <p style={errorText}>{error}</p>}
         {loading && (
           <p style={{ fontSize: 13, color: '#6B7280' }}>Loading users…</p>
         )}
-        {error && <p style={errorText}>{error}</p>}
 
         <Table columns={columns} data={data} />
+
+        <div style={paginationRow}>
+          <span>
+            Showing page {page} of {totalPages} · Total {total} users
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => fetchUsers(page - 1)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 999,
+                background: page <= 1 ? '#E5E7EB' : '#F3F4F6',
+                color: '#111827',
+                border: '1px solid #D1D5DB',
+                fontSize: 13,
+              }}
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              disabled={page >= totalPages}
+              onClick={() => fetchUsers(page + 1)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 999,
+                background: page >= totalPages ? '#E5E7EB' : '#F3F4F6',
+                color: '#111827',
+                border: '1px solid #D1D5DB',
+                fontSize: 13,
+              }}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </div>
     </AdminLayout>
   );

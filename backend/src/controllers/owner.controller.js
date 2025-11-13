@@ -45,9 +45,12 @@ export async function getOwnerDashboard(req, res, next) {
 export async function getOwnerStoresSummary(req, res, next) {
   try {
     const ownerId = req.user.id;
+    const page = parseInt(req.query.page || '1', 10);
+    const pageSize = parseInt(req.query.pageSize || '10', 10);
+
     const stores = await getStoresByOwner(ownerId);
 
-    const storeSummaries = await Promise.all(
+    const storeSummariesAll = await Promise.all(
       stores.map(async (store) => {
         const ratings = await getRatingsForStore(store.id);
         const avg =
@@ -66,7 +69,19 @@ export async function getOwnerStoresSummary(req, res, next) {
       })
     );
 
-    return res.json({ stores: storeSummaries });
+    const total = storeSummariesAll.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(Math.max(page, 1), totalPages);
+    const start = (safePage - 1) * pageSize;
+    const paged = storeSummariesAll.slice(start, start + pageSize);
+
+    return res.json({
+      stores: paged,
+      page: safePage,
+      pageSize,
+      total,
+      totalPages,
+    });
   } catch (err) {
     next(err);
   }
