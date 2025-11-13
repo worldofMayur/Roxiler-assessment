@@ -1,50 +1,74 @@
-// Simple in-memory Rating model
+import pool from '../config/db.js';
 
-let ratings = [];
-let nextId = 1;
+export async function upsertRating(userId, storeId, value) {
+  const conn = await pool.getConnection();
+  try {
+    // Using INSERT ... ON DUPLICATE KEY UPDATE thanks to UNIQUE(user_id, store_id)
+    await conn.query(
+      `INSERT INTO ratings (user_id, store_id, rating)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE rating = VALUES(rating), updated_at = CURRENT_TIMESTAMP`,
+      [userId, storeId, value]
+    );
 
-export function upsertRating(userId, storeId, value) {
-  const now = new Date().toISOString();
-  let r = ratings.find(
-    (rt) => rt.userId === userId && rt.storeId === storeId
-  );
-
-  if (r) {
-    r.rating = value;
-    r.updatedAt = now;
-  } else {
-    r = {
-      id: nextId++,
-      userId,
-      storeId,
-      rating: value,
-      createdAt: now,
-      updatedAt: now,
-    };
-    ratings.push(r);
+    // Get row back if needed
+    const [rows] = await conn.query(
+      'SELECT * FROM ratings WHERE user_id = ? AND store_id = ? LIMIT 1',
+      [userId, storeId]
+    );
+    return rows[0];
+  } finally {
+    conn.release();
   }
-
-  return r;
 }
 
-export function getAverageRatingForStore(storeId) {
-  const rs = ratings.filter((r) => r.storeId === storeId);
-  if (!rs.length) return null;
-  const sum = rs.reduce((acc, r) => acc + r.rating, 0);
-  return sum / rs.length;
+export async function getAverageRatingForStore(storeId) {
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.query(
+      'SELECT AVG(rating) AS avgRating FROM ratings WHERE store_id = ?',
+      [storeId]
+    );
+    const avg = rows[0].avgRating;
+    if (avg === null) return null;
+    return Number(avg);
+  } finally {
+    conn.release();
+  }
 }
 
-export function getUserRatingForStore(userId, storeId) {
-  return (
-    ratings.find((r) => r.userId === userId && r.storeId === storeId) || null
-  );
+export async function getUserRatingForStore(userId, storeId) {
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.query(
+      'SELECT * FROM ratings WHERE user_id = ? AND store_id = ? LIMIT 1',
+      [userId, storeId]
+    );
+    return rows.length ? rows[0] : null;
+  } finally {
+    conn.release();
+  }
 }
 
-export function getRatingsForStore(storeId) {
-  return ratings.filter((r) => r.storeId === storeId);
+export async function getRatingsForStore(storeId) {
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.query(
+      'SELECT * FROM ratings WHERE store_id = ?',
+      [storeId]
+    );
+    return rows;
+  } finally {
+    conn.release();
+  }
 }
 
-// NEW: for admin dashboard total ratings
-export function getAllRatings() {
-  return ratings;
+export async function getAllRatings() {
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.query('SELECT * FROM ratings');
+    return rows;
+  } finally {
+    conn.release();
+  }
 }

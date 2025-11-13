@@ -1,44 +1,85 @@
-import { getAllStores } from '../models/Store.js';
+import {
+  getAllStores,
+  findStoreById,
+} from '../models/Store.js';
+
 import {
   getAverageRatingForStore,
   getUserRatingForStore,
+  upsertRating,
 } from '../models/Rating.js';
 
-// GET /api/stores  (for normal user)
+// GET /api/stores  (USER ONLY)
 export async function getStoresForUser(req, res, next) {
   try {
     const userId = req.user.id;
+
     const searchName = (req.query.searchName || '').toLowerCase();
     const searchAddress = (req.query.searchAddress || '').toLowerCase();
 
-    let stores = getAllStores();
+    let stores = await getAllStores();
 
+    // Filtering
     if (searchName) {
       stores = stores.filter((s) =>
         s.name.toLowerCase().includes(searchName)
       );
     }
-
     if (searchAddress) {
       stores = stores.filter((s) =>
-        s.address.toLowerCase().includes(searchAddress)
+        (s.address || '').toLowerCase().includes(searchAddress)
       );
     }
 
-    const result = stores.map((store) => {
-      const overall = getAverageRatingForStore(store.id);
-      const userRating = getUserRatingForStore(userId, store.id);
+    // Attach rating info
+    const mapped = await Promise.all(
+      stores.map(async (s) => {
+        const avgRating = await getAverageRatingForStore(s.id);
+        const userRatingObj = await getUserRatingForStore(userId, s.id);
 
-      return {
-        id: store.id,
-        name: store.name,
-        address: store.address,
-        overallRating: overall ?? 0,
-        userRating: userRating ? userRating.rating : null,
-      };
+        return {
+          id: s.id,
+          name: s.name,
+          email: s.email,
+          address: s.address,
+          overallRating: avgRating ? Number(avgRating.toFixed(1)) : 0,
+          userRating: userRatingObj ? userRatingObj.rating : null,
+        };
+      })
+    );
+
+    return res.json({ stores: mapped });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// POST /api/ratings/:storeId  (USER ONLY)
+export async function rateStore(req, res, next) {
+  try {
+    const userId = req.user.id;
+    const storeId = Number(req.params.storeId);
+    const { rating } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        message: 'Rating must be between 1 and 5.',
+      });
+    }
+
+    const store = await findStoreById(storeId);
+    if (!store) {
+      return res.status(404).json({ message: 'Store not found.' });
+    }
+
+    await upsertRating(userId, storeId, rating);
+
+    const updatedAvg = await getAverageRatingForStore(storeId);
+
+    return res.json({
+      message: 'Rating saved successfully.',
+      updatedOverallRating: updatedAvg ? Number(updatedAvg.toFixed(1)) : 0,
     });
-
-    return res.json({ stores: result });
   } catch (err) {
     next(err);
   }
