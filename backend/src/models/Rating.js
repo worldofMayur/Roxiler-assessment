@@ -43,3 +43,8 @@ export function getUserRatingForStore(userId, storeId) {
 export function getRatingsForStore(storeId) {
   return ratings.filter((r) => r.storeId === storeId);
 }
+
+// NEW: for admin dashboard total ratings
+export function getAllRatings() {
+  return ratings;
+}
