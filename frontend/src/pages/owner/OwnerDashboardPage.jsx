@@ -3,6 +3,7 @@ import OwnerLayout from '../../components/Layout/OwnerLayout.jsx';
 import Table from '../../components/UI/Table.jsx';
 import RatingStars from '../../components/UI/RatingStars.jsx';
 import Button from '../../components/UI/Button.jsx';
+import Input from '../../components/UI/Input.jsx';
 import api from '../../api/client.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -16,10 +17,26 @@ export default function OwnerDashboardPage() {
   });
   const [stores, setStores] = useState([]);
   const [selectedStoreDetails, setSelectedStoreDetails] = useState(null);
+
   const [loadingStats, setLoadingStats] = useState(false);
   const [loadingStores, setLoadingStores] = useState(false);
   const [loadingRaters, setLoadingRaters] = useState(false);
   const [error, setError] = useState('');
+
+  // create / edit form state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formValues, setFormValues] = useState({
+    id: null,
+    name: '',
+    email: '',
+    address: '',
+  });
+
+  function updateForm(field, value) {
+    setFormValues((prev) => ({ ...prev, [field]: value }));
+  }
 
   async function fetchStats() {
     if (!token) return;
@@ -75,6 +92,50 @@ export default function OwnerDashboardPage() {
     fetchStores();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  async function handleCreateOrUpdate(e) {
+    e.preventDefault();
+    if (!token) return;
+    setSaving(true);
+    setError('');
+
+    try {
+      const payload = {
+        name: formValues.name,
+        email: formValues.email || null,
+        address: formValues.address || null,
+      };
+
+      if (formValues.id == null) {
+        // create
+        await api.post('/owner/stores', payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        // update
+        await api.put(`/owner/stores/${formValues.id}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+
+      // reset form
+      setFormValues({
+        id: null,
+        name: '',
+        email: '',
+        address: '',
+      });
+      setShowCreateForm(false);
+      setShowEditForm(false);
+
+      // refresh data
+      await Promise.all([fetchStores(), fetchStats()]);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save store');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const grid = {
     display: 'grid',
@@ -135,6 +196,13 @@ export default function OwnerDashboardPage() {
     border: '1px solid #E5E7EB',
   };
 
+  const headerRow = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  };
+
   const sectionTitle = {
     fontSize: 18,
     fontWeight: 600,
@@ -153,12 +221,33 @@ export default function OwnerDashboardPage() {
     marginTop: 8,
   };
 
+  const formCard = {
+    marginBottom: 16,
+    padding: '12px 12px',
+    borderRadius: 12,
+    background: '#F9FAFB',
+    border: '1px solid #E5E7EB',
+  };
+
+  const formRow = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0,1fr)) auto',
+    gap: 8,
+    alignItems: 'center',
+  };
+
+  const formLabel = {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  };
+
   const columns = [
     { key: 'name', header: 'Store' },
     { key: 'address', header: 'Address' },
     { key: 'rating', header: 'Average Rating' },
     { key: 'count', header: 'Total Ratings' },
-    { key: 'actions', header: 'Details' },
+    { key: 'actions', header: 'Actions' },
   ];
 
   const data = stores.map((s) => ({
@@ -167,18 +256,41 @@ export default function OwnerDashboardPage() {
     rating: <RatingStars value={Math.round(s.averageRating || 0)} />,
     count: s.ratingsCount,
     actions: (
-      <Button
-        style={{
-          padding: '6px 10px',
-          fontSize: 13,
-          borderRadius: 8,
-          background: '#2563EB',
-          border: 'none',
-        }}
-        onClick={() => fetchRaters(s.id)}
-      >
-        View raters
-      </Button>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button
+          style={{
+            padding: '6px 10px',
+            fontSize: 13,
+            borderRadius: 8,
+            background: '#2563EB',
+            border: 'none',
+          }}
+          onClick={() => fetchRaters(s.id)}
+        >
+          View raters
+        </Button>
+        <Button
+          style={{
+            padding: '6px 10px',
+            fontSize: 13,
+            borderRadius: 8,
+            background: '#111827',
+            border: 'none',
+          }}
+          onClick={() => {
+            setFormValues({
+              id: s.id,
+              name: s.name || '',
+              email: s.email || '',
+              address: s.address || '',
+            });
+            setShowEditForm(true);
+            setShowCreateForm(false);
+          }}
+        >
+          Edit
+        </Button>
+      </div>
     ),
   }));
 
@@ -221,7 +333,9 @@ export default function OwnerDashboardPage() {
           <div style={statBox}>
             <div style={statLabel}>Average Rating</div>
             <div style={statValue}>
-              {stats.averageRating.toFixed ? stats.averageRating.toFixed(1) : stats.averageRating}
+              {stats.averageRating.toFixed
+                ? stats.averageRating.toFixed(1)
+                : stats.averageRating}
             </div>
           </div>
         </div>
@@ -231,12 +345,127 @@ export default function OwnerDashboardPage() {
 
       {/* Stores + raters grid */}
       <div style={grid}>
-        {/* Stores list */}
+        {/* Stores list + create/edit */}
         <div style={card}>
-          <div style={sectionTitle}>Your Stores</div>
-          <div style={sectionSubtitle}>
-            Each store with its average rating and number of ratings.
+          <div style={headerRow}>
+            <div>
+              <div style={sectionTitle}>Your Stores</div>
+              <div style={sectionSubtitle}>
+                Each store with its average rating and number of ratings.
+              </div>
+            </div>
+            <Button
+              style={{
+                padding: '8px 12px',
+                background: '#2563EB',
+                borderRadius: 999,
+                border: 'none',
+                fontSize: 13,
+              }}
+              onClick={() => {
+                setFormValues({
+                  id: null,
+                  name: '',
+                  email: '',
+                  address: '',
+                });
+                setShowCreateForm((v) => !v);
+                setShowEditForm(false);
+              }}
+            >
+              {showCreateForm ? 'Cancel' : 'Add Store'}
+            </Button>
           </div>
+
+          {(showCreateForm || showEditForm) && (
+            <form style={formCard} onSubmit={handleCreateOrUpdate}>
+              <div
+                style={{
+                  marginBottom: 8,
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+              >
+                {formValues.id == null ? 'Create New Store' : 'Edit Store'}
+              </div>
+              <div style={formRow}>
+                <div>
+                  <div style={formLabel}>Store Name</div>
+                  <Input
+                    placeholder="Store name"
+                    value={formValues.name}
+                    onChange={(e) => updateForm('name', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <div style={formLabel}>Email (optional)</div>
+                  <Input
+                    placeholder="Store email"
+                    value={formValues.email}
+                    onChange={(e) => updateForm('email', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <div style={formLabel}>Address (optional)</div>
+                  <Input
+                    placeholder="Store address"
+                    value={formValues.address}
+                    onChange={(e) => updateForm('address', e.target.value)}
+                  />
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 8,
+                    alignItems: 'flex-end',
+                  }}
+                >
+                  <Button
+                    type="submit"
+                    disabled={saving}
+                    style={{
+                      padding: '8px 14px',
+                      background: '#2563EB',
+                      border: 'none',
+                      borderRadius: 10,
+                      fontSize: 13,
+                    }}
+                  >
+                    {saving
+                      ? 'Saving...'
+                      : formValues.id == null
+                      ? 'Create'
+                      : 'Save'}
+                  </Button>
+                  {(showCreateForm || showEditForm) && (
+                    <Button
+                      type="button"
+                      style={{
+                        padding: '8px 14px',
+                        background: '#E5E7EB',
+                        color: '#374151',
+                        border: 'none',
+                        borderRadius: 10,
+                        fontSize: 13,
+                      }}
+                      onClick={() => {
+                        setShowCreateForm(false);
+                        setShowEditForm(false);
+                        setFormValues({
+                          id: null,
+                          name: '',
+                          email: '',
+                          address: '',
+                        });
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </form>
+          )}
 
           {loadingStores && (
             <p style={{ fontSize: 13, color: '#6B7280' }}>Loading stores…</p>
@@ -244,7 +473,8 @@ export default function OwnerDashboardPage() {
 
           {stores.length === 0 && !loadingStores ? (
             <p style={{ fontSize: 13, color: '#6B7280' }}>
-              You don&apos;t own any stores yet.
+              You don&apos;t own any stores yet. Use &quot;Add Store&quot; to
+              create one.
             </p>
           ) : (
             <Table columns={columns} data={data} />
@@ -268,7 +498,8 @@ export default function OwnerDashboardPage() {
             </p>
           ) : ratersData.length === 0 ? (
             <p style={{ fontSize: 13, color: '#6B7280' }}>
-              No ratings yet for <strong>{selectedStoreDetails.store.name}</strong>.
+              No ratings yet for{' '}
+              <strong>{selectedStoreDetails.store.name}</strong>.
             </p>
           ) : (
             <>

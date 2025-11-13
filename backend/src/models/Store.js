@@ -1,7 +1,6 @@
 import pool from '../config/db.js';
 
-// We assign owner@example.com as owner of first two stores.
-// We need its ID, so we'll resolve it via a small query.
+// Seed demo stores owned by owner@example.com
 async function seedStores() {
   const conn = await pool.getConnection();
   try {
@@ -94,6 +93,33 @@ export async function createStore({ name, email, address, ownerId = null }) {
       address,
       ownerId,
     };
+  } finally {
+    conn.release();
+  }
+}
+
+export async function updateStore({ id, name, email, address, ownerId }) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.query(
+      'UPDATE stores SET name = ?, email = ?, address = ?, owner_id = ? WHERE id = ?',
+      [name, email, address, ownerId, id]
+    );
+
+    const [rows] = await conn.query(
+      'SELECT id, name, email, address, owner_id AS ownerId FROM stores WHERE id = ?',
+      [id]
+    );
+    return rows.length ? rows[0] : null;
+  } finally {
+    conn.release();
+  }
+}
+
+export async function deleteStore(id) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.query('DELETE FROM stores WHERE id = ?', [id]);
   } finally {
     conn.release();
   }

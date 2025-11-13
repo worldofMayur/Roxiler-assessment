@@ -20,8 +20,24 @@ export default function AdminStoresPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // create / edit form state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [formValues, setFormValues] = useState({
+    id: null,
+    name: '',
+    email: '',
+    address: '',
+    ownerEmail: '',
+  });
+  const [saving, setSaving] = useState(false);
+
   function updateFilter(field, value) {
     setFilters((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function updateForm(field, value) {
+    setFormValues((prev) => ({ ...prev, [field]: value }));
   }
 
   async function fetchStores() {
@@ -89,11 +105,33 @@ export default function AdminStoresPage() {
     marginBottom: 10,
   };
 
+  const formCard = {
+    marginBottom: 16,
+    padding: '12px 12px',
+    borderRadius: 12,
+    background: '#F9FAFB',
+    border: '1px solid #E5E7EB',
+  };
+
+  const formRow = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, minmax(0, 1fr)) auto',
+    gap: 8,
+    alignItems: 'center',
+  };
+
+  const formLabel = {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  };
+
   const columns = [
     { key: 'name', header: 'Name' },
     { key: 'email', header: 'Email' },
     { key: 'address', header: 'Address' },
     { key: 'rating', header: 'Rating' },
+    { key: 'actions', header: 'Actions' },
   ];
 
   const data = stores.map((s) => ({
@@ -101,7 +139,74 @@ export default function AdminStoresPage() {
     email: s.email,
     address: s.address,
     rating: <RatingStars value={Math.round(s.rating || 0)} />,
+    actions: (
+      <Button
+        style={{
+          padding: '6px 10px',
+          fontSize: 13,
+          borderRadius: 8,
+          background: '#2563EB',
+          border: 'none',
+        }}
+        onClick={() => {
+          setFormValues({
+            id: s.id,
+            name: s.name || '',
+            email: s.email || '',
+            address: s.address || '',
+            ownerEmail: '',
+          });
+          setShowEditForm(true);
+          setShowCreateForm(false);
+        }}
+      >
+        Edit
+      </Button>
+    ),
   }));
+
+  async function handleCreateOrUpdate(e) {
+    e.preventDefault();
+    if (!token) return;
+    setSaving(true);
+    setError('');
+
+    try {
+      const payload = {
+        name: formValues.name,
+        email: formValues.email || null,
+        address: formValues.address || null,
+        ownerEmail: formValues.ownerEmail || undefined,
+      };
+
+      if (formValues.id == null) {
+        // create
+        await api.post('/admin/stores', payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        // update
+        await api.put(`/admin/stores/${formValues.id}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+
+      setFormValues({
+        id: null,
+        name: '',
+        email: '',
+        address: '',
+        ownerEmail: '',
+      });
+      setShowCreateForm(false);
+      setShowEditForm(false);
+      await fetchStores();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save store');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <AdminLayout>
@@ -109,9 +214,120 @@ export default function AdminStoresPage() {
         <div style={headerRow}>
           <div>
             <div style={title}>Stores</div>
-            <div style={subtitle}>Filter stores and see their ratings.</div>
+            <div style={subtitle}>
+              Filter stores, see their ratings, and manage them.
+            </div>
           </div>
+          <Button
+            style={{
+              padding: '8px 12px',
+              background: '#2563EB',
+              borderRadius: 999,
+              border: 'none',
+              fontSize: 13,
+            }}
+            onClick={() => {
+              setFormValues({
+                id: null,
+                name: '',
+                email: '',
+                address: '',
+                ownerEmail: '',
+              });
+              setShowCreateForm((v) => !v);
+              setShowEditForm(false);
+            }}
+          >
+            {showCreateForm ? 'Cancel' : 'Add Store'}
+          </Button>
         </div>
+
+        {(showCreateForm || showEditForm) && (
+          <form style={formCard} onSubmit={handleCreateOrUpdate}>
+            <div style={{ marginBottom: 8, fontSize: 13, fontWeight: 500 }}>
+              {formValues.id == null ? 'Create New Store' : 'Edit Store'}
+            </div>
+            <div style={formRow}>
+              <div>
+                <div style={formLabel}>Store Name</div>
+                <Input
+                  placeholder="Store name"
+                  value={formValues.name}
+                  onChange={(e) => updateForm('name', e.target.value)}
+                />
+              </div>
+              <div>
+                <div style={formLabel}>Email (optional)</div>
+                <Input
+                  placeholder="Store email"
+                  value={formValues.email}
+                  onChange={(e) => updateForm('email', e.target.value)}
+                />
+              </div>
+              <div>
+                <div style={formLabel}>Address (optional)</div>
+                <Input
+                  placeholder="Store address"
+                  value={formValues.address}
+                  onChange={(e) => updateForm('address', e.target.value)}
+                />
+              </div>
+              <div>
+                <div style={formLabel}>Owner Email (optional)</div>
+                <Input
+                  placeholder="owner@example.com"
+                  value={formValues.ownerEmail}
+                  onChange={(e) => updateForm('ownerEmail', e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                <Button
+                  type="submit"
+                  disabled={saving}
+                  style={{
+                    padding: '8px 14px',
+                    background: '#2563EB',
+                    border: 'none',
+                    borderRadius: 10,
+                    fontSize: 13,
+                  }}
+                >
+                  {saving
+                    ? 'Saving...'
+                    : formValues.id == null
+                    ? 'Create'
+                    : 'Save'}
+                </Button>
+                {(showEditForm || showCreateForm) && (
+                  <Button
+                    type="button"
+                    style={{
+                      padding: '8px 14px',
+                      background: '#E5E7EB',
+                      color: '#374151',
+                      border: 'none',
+                      borderRadius: 10,
+                      fontSize: 13,
+                    }}
+                    onClick={() => {
+                      setShowCreateForm(false);
+                      setShowEditForm(false);
+                      setFormValues({
+                        id: null,
+                        name: '',
+                        email: '',
+                        address: '',
+                        ownerEmail: '',
+                      });
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </div>
+          </form>
+        )}
 
         <div style={filtersRow}>
           <Input
