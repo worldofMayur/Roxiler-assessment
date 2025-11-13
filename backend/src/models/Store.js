@@ -3,6 +3,7 @@
 let stores = [];
 let nextId = 1;
 
+// NOTE: ownerId === 2 is the default owner@example.com from User model seeding
 function seedStores() {
   if (stores.length) return;
 
@@ -11,7 +12,7 @@ function seedStores() {
     name: 'Star Supermarket Central Branch',
     email: 'central@starsupermarket.com',
     address: 'Main Street 1, Downtown City',
-    ownerId: null, // will be used later when we add store owners
+    ownerId: 2,
   });
 
   stores.push({
@@ -19,7 +20,7 @@ function seedStores() {
     name: 'Tech World Electronics Plaza',
     email: 'contact@techworld.com',
     address: 'Market Road 5, Tech District',
-    ownerId: null,
+    ownerId: 2, // same owner, for demo
   });
 
   stores.push({
@@ -27,7 +28,7 @@ function seedStores() {
     name: 'Fresh Farm Organic Foods',
     email: 'hello@freshfarm.com',
     address: 'Green Avenue 9, Garden Area',
-    ownerId: null,
+    ownerId: null, // unassigned
   });
 }
 
@@ -41,7 +42,6 @@ export function findStoreById(id) {
   return stores.find((s) => s.id === id);
 }
 
-// We’ll use this later for the admin "add store" feature
 export function createStore({ name, email, address, ownerId = null }) {
   const store = {
     id: nextId++,
@@ -52,4 +52,8 @@ export function createStore({ name, email, address, ownerId = null }) {
   };
   stores.push(store);
   return store;
+}
+
+export function getStoresByOwner(ownerId) {
+  return stores.filter((s) => s.ownerId === ownerId);
 }

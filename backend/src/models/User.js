@@ -11,26 +11,37 @@ function validateRole(role) {
   }
 }
 
-// --------- SEED ADMIN USER --------------
-async function seedAdmin() {
-  const existing = users.find((u) => u.email === 'admin@example.com');
-  if (existing) return;
+async function seedInitialUsers() {
+  // admin
+  const hasAdmin = users.some((u) => u.email === 'admin@example.com');
+  if (!hasAdmin) {
+    const passwordHash = await bcrypt.hash('Admin@123', 10);
+    users.push({
+      id: nextId++,
+      name: 'Default Platform Administrator User',
+      email: 'admin@example.com',
+      address: 'Admin Address',
+      role: 'ADMIN',
+      passwordHash,
+    });
+  }
 
-  const passwordHash = await bcrypt.hash('Admin@123', 10);
-
-  users.push({
-    id: nextId++,
-    name: 'Default Platform Administrator User', // >20 chars
-    email: 'admin@example.com',
-    address: 'Admin Address',
-    role: 'ADMIN',
-    passwordHash,
-  });
+  // owner
+  const hasOwner = users.some((u) => u.email === 'owner@example.com');
+  if (!hasOwner) {
+    const passwordHash = await bcrypt.hash('Owner@123', 10);
+    users.push({
+      id: nextId++,
+      name: 'Default Store Owner Account',
+      email: 'owner@example.com',
+      address: 'Owner Address',
+      role: 'OWNER',
+      passwordHash,
+    });
+  }
 }
 
-await seedAdmin();
-
-// --------- CRUD FUNCTIONS --------------
+await seedInitialUsers();
 
 export async function createUser({ name, email, address, password, role = 'USER' }) {
   validateRole(role);
