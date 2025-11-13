@@ -2,7 +2,14 @@ import React from 'react';
 
 export default function Table({ columns, data }) {
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+    <table
+      style={{
+        width: '100%',
+        borderCollapse: 'collapse',
+        fontSize: '0.9rem',
+        background: '#FFFFFF',
+      }}
+    >
       <thead>
         <tr>
           {columns.map((col) => (
@@ -10,8 +17,11 @@ export default function Table({ columns, data }) {
               key={col.key}
               style={{
                 textAlign: 'left',
-                borderBottom: '1px solid #4b5563',
-                padding: '8px'
+                padding: '10px 12px',
+                borderBottom: '1px solid #E5E7EB',
+                fontWeight: 600,
+                color: '#4B5563',
+                background: '#F9FAFB',
               }}
             >
               {col.header}
@@ -21,9 +31,21 @@ export default function Table({ columns, data }) {
       </thead>
       <tbody>
         {data.map((row, idx) => (
-          <tr key={idx}>
+          <tr
+            key={idx}
+            style={{
+              borderBottom: '1px solid #E5E7EB',
+            }}
+          >
             {columns.map((col) => (
-              <td key={col.key} style={{ padding: '8px', borderBottom: '1px solid #1f2933' }}>
+              <td
+                key={col.key}
+                style={{
+                  padding: '10px 12px',
+                  verticalAlign: 'middle',
+                  color: '#111827',
+                }}
+              >
                 {row[col.key]}
               </td>
             ))}
