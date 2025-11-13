@@ -1,53 +1,39 @@
 import bcrypt from 'bcryptjs';
 import pool from '../config/db.js';
 
-const ROLES = ['ADMIN', 'USER', 'OWNER'];
-
-function validateRole(role) {
-  if (!ROLES.includes(role)) {
-    throw new Error(`Invalid role: ${role}`);
-  }
-}
-
-// --------- SEED ADMIN + OWNER ACCOUNTS --------------
-
-async function seedInitialUsers() {
+async function ensureAdminAndOwnerSeeded() {
   const conn = await pool.getConnection();
   try {
-    // Admin
-    const [rowsAdmin] = await conn.query(
-      'SELECT id FROM users WHERE email = ? LIMIT 1',
-      ['admin@example.com']
-    );
-    if (rowsAdmin.length === 0) {
+    const [adminRows] = await conn.query('SELECT id FROM users WHERE email = ? LIMIT 1', [
+      'admin@example.com',
+    ]);
+    if (!adminRows.length) {
       const passwordHash = await bcrypt.hash('Admin@123', 10);
       await conn.query(
-        'INSERT INTO users (name, email, address, role, password_hash) VALUES (?,?,?,?,?)',
+        'INSERT INTO users (name, email, address, password_hash, role) VALUES (?,?,?,?,?)',
         [
-          'Default Platform Administrator User',
+          'Administrator Account',
           'admin@example.com',
-          'Admin Address',
-          'ADMIN',
+          'Admin HQ, System City',
           passwordHash,
+          'ADMIN',
         ]
       );
     }
 
-    // Owner
-    const [rowsOwner] = await conn.query(
-      'SELECT id FROM users WHERE email = ? LIMIT 1',
-      ['owner@example.com']
-    );
-    if (rowsOwner.length === 0) {
+    const [ownerRows] = await conn.query('SELECT id FROM users WHERE email = ? LIMIT 1', [
+      'owner@example.com',
+    ]);
+    if (!ownerRows.length) {
       const passwordHash = await bcrypt.hash('Owner@123', 10);
       await conn.query(
-        'INSERT INTO users (name, email, address, role, password_hash) VALUES (?,?,?,?,?)',
+        'INSERT INTO users (name, email, address, password_hash, role) VALUES (?,?,?,?,?)',
         [
-          'Default Store Owner Account',
+          'Default Store Owner',
           'owner@example.com',
-          'Owner Address',
-          'OWNER',
+          'Owner Street 10, Business District',
           passwordHash,
+          'OWNER',
         ]
       );
     }
@@ -56,31 +42,62 @@ async function seedInitialUsers() {
   }
 }
 
-// call seeding once on module load
-await seedInitialUsers();
+await ensureAdminAndOwnerSeeded();
 
-// --------- MODEL FUNCTIONS --------------
-
-export async function createUser({ name, email, address, password, role = 'USER' }) {
-  validateRole(role);
-
+export async function getAllUsers() {
   const conn = await pool.getConnection();
   try {
-    const [existing] = await conn.query(
-      'SELECT id FROM users WHERE email = ? LIMIT 1',
+    const [rows] = await conn.query(
+      'SELECT id, name, email, address, role FROM users'
+    );
+    return rows;
+  } finally {
+    conn.release();
+  }
+}
+
+export async function findUserByEmail(email) {
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.query(
+      'SELECT id, name, email, address, password_hash AS passwordHash, role FROM users WHERE email = ? LIMIT 1',
       [email]
     );
-    if (existing.length > 0) {
-      const error = new Error('Email already in use');
-      error.status = 400;
+    if (!rows.length) return null;
+    return rows[0];
+  } finally {
+    conn.release();
+  }
+}
+
+export async function findUserById(id) {
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.query(
+      'SELECT id, name, email, address, password_hash AS passwordHash, role FROM users WHERE id = ? LIMIT 1',
+      [id]
+    );
+    if (!rows.length) return null;
+    return rows[0];
+  } finally {
+    conn.release();
+  }
+}
+
+export async function createUser({ name, email, address, password, role }) {
+  const conn = await pool.getConnection();
+  try {
+    const existing = await findUserByEmail(email);
+    if (existing) {
+      const error = new Error('User with this email already exists.');
+      error.status = 409;
       throw error;
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-
     const [result] = await conn.query(
-      'INSERT INTO users (name, email, address, role, password_hash) VALUES (?,?,?,?,?)',
-      [name, email, address, role, passwordHash]
+      'INSERT INTO users (name, email, address, password_hash, role) VALUES (?,?,?,?,?)',
+      [name, email, address, passwordHash, role]
     );
 
     return {
@@ -95,27 +112,12 @@ export async function createUser({ name, email, address, password, role = 'USER'
   }
 }
 
-export async function findUserByEmail(email) {
-  const conn = await pool.getConnection();
-  try {
-    const [rows] = await conn.query(
-      'SELECT * FROM users WHERE email = ? LIMIT 1',
-      [email]
-    );
-    if (rows.length === 0) return null;
-    return rows[0];
-  } finally {
-    conn.release();
-  }
-}
+// --- New helper for deletes ---
 
-export async function getAllUsers() {
+export async function deleteUser(id) {
   const conn = await pool.getConnection();
   try {
-    const [rows] = await conn.query(
-      'SELECT id, name, email, address, role FROM users'
-    );
-    return rows;
+    await conn.query('DELETE FROM users WHERE id = ?', [id]);
   } finally {
     conn.release();
   }

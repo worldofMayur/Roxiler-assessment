@@ -3,11 +3,13 @@ import {
   findStoreById,
   createStore,
   updateStore,
+  deleteStore,
 } from '../models/Store.js';
 import {
   getAllRatings,
   getRatingsForStore,
   getAverageRatingForStore,
+  deleteRatingsByStore,
 } from '../models/Rating.js';
 import { getAllUsers } from '../models/User.js';
 
@@ -178,6 +180,29 @@ export async function updateStoreOwner(req, res, next) {
     });
 
     return res.json({ store: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// DELETE /api/owner/stores/:storeId
+export async function deleteStoreOwner(req, res, next) {
+  try {
+    const ownerId = req.user.id;
+    const storeId = Number(req.params.storeId);
+
+    const store = await findStoreById(storeId);
+    if (!store) {
+      return res.status(404).json({ message: 'Store not found.' });
+    }
+    if (store.ownerId !== ownerId) {
+      return res.status(403).json({ message: 'You do not own this store.' });
+    }
+
+    await deleteRatingsByStore(storeId);
+    await deleteStore(storeId);
+
+    return res.status(204).send();
   } catch (err) {
     next(err);
   }

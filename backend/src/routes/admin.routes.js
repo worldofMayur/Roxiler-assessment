@@ -6,6 +6,8 @@ import {
   listStores,
   createStoreAdmin,
   updateStoreAdmin,
+  deleteUserAdmin,
+  deleteStoreAdmin,
 } from '../controllers/admin.controller.js';
 
 const router = Router();
@@ -20,5 +22,9 @@ router.get('/stores', listStores);
 // manage stores
 router.post('/stores', createStoreAdmin);
 router.put('/stores/:storeId', updateStoreAdmin);
+router.delete('/stores/:storeId', deleteStoreAdmin);
+
+// manage users
+router.delete('/users/:userId', deleteUserAdmin);
 
 export default router;

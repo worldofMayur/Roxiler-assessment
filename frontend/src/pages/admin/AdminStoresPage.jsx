@@ -36,6 +36,7 @@ export default function AdminStoresPage() {
     ownerEmail: '',
   });
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   function updateFilter(field, value) {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -76,6 +77,64 @@ export default function AdminStoresPage() {
     fetchStores(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  async function handleCreateOrUpdate(e) {
+    e.preventDefault();
+    if (!token) return;
+    setSaving(true);
+    setError('');
+
+    try {
+      const payload = {
+        name: formValues.name,
+        email: formValues.email || null,
+        address: formValues.address || null,
+        ownerEmail: formValues.ownerEmail || undefined,
+      };
+
+      if (formValues.id == null) {
+        await api.post('/admin/stores', payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        await api.put(`/admin/stores/${formValues.id}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+
+      setFormValues({
+        id: null,
+        name: '',
+        email: '',
+        address: '',
+        ownerEmail: '',
+      });
+      setShowCreateForm(false);
+      setShowEditForm(false);
+      await fetchStores(1);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save store');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteStore(id) {
+    if (!token) return;
+    if (!window.confirm('Are you sure you want to delete this store?')) return;
+    setDeletingId(id);
+    setError('');
+    try {
+      await api.delete(`/admin/stores/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchStores(1);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to delete store');
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   const card = {
     background: '#FFFFFF',
@@ -158,73 +217,45 @@ export default function AdminStoresPage() {
     address: s.address,
     rating: <RatingStars value={Math.round(s.rating || 0)} />,
     actions: (
-      <Button
-        style={{
-          padding: '6px 10px',
-          fontSize: 13,
-          borderRadius: 8,
-          background: '#2563EB',
-          border: 'none',
-        }}
-        onClick={() => {
-          setFormValues({
-            id: s.id,
-            name: s.name || '',
-            email: s.email || '',
-            address: s.address || '',
-            ownerEmail: '',
-          });
-          setShowEditForm(true);
-          setShowCreateForm(false);
-        }}
-      >
-        Edit
-      </Button>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button
+          style={{
+            padding: '6px 10px',
+            fontSize: 13,
+            borderRadius: 8,
+            background: '#2563EB',
+            border: 'none',
+          }}
+          onClick={() => {
+            setFormValues({
+              id: s.id,
+              name: s.name || '',
+              email: s.email || '',
+              address: s.address || '',
+              ownerEmail: '',
+            });
+            setShowEditForm(true);
+            setShowCreateForm(false);
+          }}
+        >
+          Edit
+        </Button>
+        <Button
+          style={{
+            padding: '6px 10px',
+            fontSize: 13,
+            borderRadius: 8,
+            background: '#DC2626',
+            border: 'none',
+          }}
+          disabled={deletingId === s.id}
+          onClick={() => handleDeleteStore(s.id)}
+        >
+          {deletingId === s.id ? 'Deleting…' : 'Delete'}
+        </Button>
+      </div>
     ),
   }));
-
-  async function handleCreateOrUpdate(e) {
-    e.preventDefault();
-    if (!token) return;
-    setSaving(true);
-    setError('');
-
-    try {
-      const payload = {
-        name: formValues.name,
-        email: formValues.email || null,
-        address: formValues.address || null,
-        ownerEmail: formValues.ownerEmail || undefined,
-      };
-
-      if (formValues.id == null) {
-        // create
-        await api.post('/admin/stores', payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      } else {
-        // update
-        await api.put(`/admin/stores/${formValues.id}`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      }
-
-      setFormValues({
-        id: null,
-        name: '',
-        email: '',
-        address: '',
-        ownerEmail: '',
-      });
-      setShowCreateForm(false);
-      setShowEditForm(false);
-      await fetchStores(1);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save store');
-    } finally {
-      setSaving(false);
-    }
-  }
 
   return (
     <AdminLayout>

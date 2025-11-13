@@ -7,7 +7,7 @@ import api from '../../api/client.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function AdminUsersPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [users, setUsers] = useState([]);
   const [filters, setFilters] = useState({
     name: '',
@@ -24,6 +24,8 @@ export default function AdminUsersPage() {
   const [pageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+
+  const [deletingId, setDeletingId] = useState(null);
 
   function updateFilter(field, value) {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -62,12 +64,29 @@ export default function AdminUsersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  async function handleDeleteUser(id) {
+    if (!token) return;
+    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    setDeletingId(id);
+    setError('');
+    try {
+      await api.delete(`/admin/users/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchUsers(1);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to delete user');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   const card = {
     background: '#FFFFFF',
     borderRadius: 18,
     padding: '20px 20px 18px',
     boxShadow: '0 12px 24px rgba(15,23,42,0.06)',
-    border: '1px solid #E5E7EB'
+    border: '1px solid #E5E7EB',
   };
 
   const headerRow = {
@@ -110,14 +129,36 @@ export default function AdminUsersPage() {
     { key: 'email', header: 'Email' },
     { key: 'address', header: 'Address' },
     { key: 'role', header: 'Role' },
+    { key: 'actions', header: 'Actions' },
   ];
 
-  const data = users.map((u) => ({
-    name: u.name,
-    email: u.email,
-    address: u.address,
-    role: u.role,
-  }));
+  const data = users.map((u) => {
+    const isSelf = user?.id === u.id;
+    const canDelete = u.role !== 'ADMIN' && !isSelf;
+    return {
+      name: u.name,
+      email: u.email,
+      address: u.address,
+      role: u.role,
+      actions: canDelete ? (
+        <Button
+          style={{
+            padding: '6px 10px',
+            fontSize: 13,
+            borderRadius: 8,
+            background: '#DC2626',
+            border: 'none',
+          }}
+          disabled={deletingId === u.id}
+          onClick={() => handleDeleteUser(u.id)}
+        >
+          {deletingId === u.id ? 'Deleting…' : 'Delete'}
+        </Button>
+      ) : (
+        <span style={{ fontSize: 12, color: '#9CA3AF' }}>Protected</span>
+      ),
+    };
+  });
 
   return (
     <AdminLayout>
@@ -125,7 +166,7 @@ export default function AdminUsersPage() {
         <div style={headerRow}>
           <div style={title}>Users</div>
           <div style={subtitle}>
-            Filter and inspect users registered in the rating platform.
+            Filter and manage users registered in the rating platform.
           </div>
         </div>
 

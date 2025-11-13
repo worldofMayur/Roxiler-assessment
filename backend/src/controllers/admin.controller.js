@@ -1,12 +1,19 @@
-import { getAllUsers, findUserByEmail } from '../models/User.js';
+import {
+  getAllUsers,
+  findUserByEmail,
+  deleteUser,
+} from '../models/User.js';
 import {
   getAllStores,
   createStore,
   updateStore,
+  deleteStore,
 } from '../models/Store.js';
 import {
   getAllRatings,
   getAverageRatingForStore,
+  deleteRatingsByStore,
+  deleteRatingsByUser,
 } from '../models/Rating.js';
 
 // GET /api/admin/dashboard
@@ -247,6 +254,44 @@ export async function updateStoreAdmin(req, res, next) {
     }
 
     return res.json({ store: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// DELETE /api/admin/users/:userId
+export async function deleteUserAdmin(req, res, next) {
+  try {
+    const userId = Number(req.params.userId);
+    if (!userId) {
+      return res.status(400).json({ message: 'User id is required.' });
+    }
+
+    // First delete ratings by this user
+    await deleteRatingsByUser(userId);
+    // Then delete the user
+    await deleteUser(userId);
+
+    return res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+// DELETE /api/admin/stores/:storeId
+export async function deleteStoreAdmin(req, res, next) {
+  try {
+    const storeId = Number(req.params.storeId);
+    if (!storeId) {
+      return res.status(400).json({ message: 'Store id is required.' });
+    }
+
+    // Delete ratings for this store
+    await deleteRatingsByStore(storeId);
+    // Delete the store
+    await deleteStore(storeId);
+
+    return res.status(204).send();
   } catch (err) {
     next(err);
   }
